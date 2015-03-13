@@ -344,17 +344,22 @@ bool InjectModule(PROCESS_INFORMATION process_info, bool resume_process)
 	// inject the module
 	//
 
-	auto L_ReleaseRemoteBuffer = [&process_info, &remote_buffer]() -> void
+	HANDLE remote_thread = NULL;
+
+	auto L_CleanUp = [&process_info, &remote_buffer, &remote_thread]() -> void
 	{
 		VirtualFreeEx(process_info.hProcess, remote_buffer, 0, MEM_RELEASE);
+
+		if (remote_thread != NULL)
+			CloseHandle(remote_thread);
 	};	
 
 	try
 	{
-		HANDLE remote_thread = CreateRemoteThread(process_info.hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)loadlibrarya_address, remote_buffer, 0, NULL);
+		remote_thread = CreateRemoteThread(process_info.hProcess, NULL, 0, (LPTHREAD_START_ROUTINE) loadlibrarya_address, remote_buffer, 0, NULL);
 		if (remote_thread == NULL)
 			throw 1;
-
+		
 		if (resume_process)
 		{
 			if (DebugSetProcessKillOnExit(false) == 0)
@@ -375,13 +380,13 @@ bool InjectModule(PROCESS_INFORMATION process_info, bool resume_process)
 		if (thread_status == 0)
 			throw 1;
 
-		L_ReleaseRemoteBuffer();
+		L_CleanUp();
 		return true;
 	}
 
 	catch (...)
 	{
-		L_ReleaseRemoteBuffer();
+		L_CleanUp();
 		return false;
 	}
 }
